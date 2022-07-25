@@ -1,0 +1,178 @@
+﻿@using NBitcoin
+@inject UTXORepo UtxoRepo
+
+<div class="card">
+    <h2 class="card-header">Create Tx</h2>
+    <div class="card-body">
+        <LabelManager @bind-SelectedLabels="TransactionLabels" Labels="UtxoRepo.LabelsToScripts.Keys.ToArray()"></LabelManager>
+
+        <ul class="list-group">
+            <li class="list-group-item h3">Inputs</li>
+            @foreach (var input in Inputs)
+            {
+                <li class="list-group-item">
+                    @input.ScriptPubKey.GetDestinationAddress(UtxoRepo.Network) <button class="btn btn-link" @onclick="() => Inputs.Remove(input)">remove</button>
+                </li>
+            }
+            <li class="list-group-item">
+                <div class="btn-toolbar">
+                    <button class="btn btn-primary btn-sm" @onclick="CreateForeignInput">Add foreign utxo</button>
+                    <div class="input-group input-group-sm ms-2">
+                        <select @bind="OwnUtxo" class="form-select form-select-sm">
+                            <option selected>Open this select menu</option>
+                            @foreach (var utxo in UtxoRepo.Utxos.Where(pair => pair.Value.Any()))
+                            {
+                                <option value="@utxo.Key.ToString()">@utxo.Key.GetDestinationAddress(UtxoRepo.Network) (-@utxo.Value.Count utxos)</option>
+                            }
+                        </select>
+                        <button class="btn btn-primary " @onclick="CreateOwnInput">Add own utxo</button>
+                    </div>
+                </div>
+
+
+            </li>
+        </ul>
+
+        <ul class="list-group">
+            <li class="list-group-item h3">Outputs</li>
+            @foreach (var output in Outputs)
+            {
+                <li class="list-group-item">
+                    @output.ScriptPubKey.GetDestinationAddress(UtxoRepo.Network) <button class="btn btn-link" @onclick="() => Outputs.Remove(output)">remove</button>
+                </li>
+            }
+            <li class="list-group-item">
+                <div class="btn-toolbar">
+                    <button class="btn btn-primary btn-sm" @onclick="CreateForeignOutput">Add foreign output</button>
+
+                    <div class="input-group input-group-sm  ms-2">
+                        <select @bind="OwnDestination" class="form-select form-select-sm">
+                            <option selected>Open this select menu</option>
+                            @foreach (var utxo in UtxoRepo.Utxos.Where(pair => !pair.Value.Any()))
+                            {
+                                <option value="@utxo.Key.ToString()">@utxo.Key.GetDestinationAddress(UtxoRepo.Network)</option>
+                            }
+                        </select>
+
+                        <button class="btn btn-primary btn-sm" @onclick="CreateOwnDestination">Add own destination</button>
+                    </div>
+                </div>
+            </li>
+        </ul>
+
+    </div>
+    <div class="card-footer">
+        <button class="btn btn-primary" @onclick="CreateTransaction">Create Transaction </button>
+    </div>
+</div>
+
+
+@code {
+
+    public List<string> TransactionLabels { get; set; } = new List<string>();
+
+    public List<CoinWithKey> Inputs { get; set; } = new();
+    public List<TxOut> Outputs { get; set; } = new();
+
+    public static OutPoint CreateOutPoint()
+        => new(RandomUtils.GetUInt256(), (uint) RandomUtils.GetInt32());
+
+    [Parameter]
+    public EventCallback TransactionProcessed { get; set; }
+
+    public void CreateTransaction()
+    {
+        if (!Inputs.Any() || !Outputs.Any())
+        {
+            return;
+        }
+        var tx = UtxoRepo.Network.CreateTransaction();
+        foreach (var input in Inputs)
+        {
+            var txin = UtxoRepo.Network.Consensus.ConsensusFactory.CreateTxIn();
+            txin.PrevOut = input.Outpoint;
+
+            tx.Inputs.Add(txin);
+        }
+
+        foreach (var output in Outputs)
+        {
+            var txout = UtxoRepo.Network.Consensus.ConsensusFactory.CreateTxOut();
+            txout.Value = output.Value;
+            txout.ScriptPubKey = output.ScriptPubKey;
+            tx.Outputs.Add(txout);
+        }
+
+        tx.Sign(Inputs.Select(key => key.Secret), Inputs);
+
+        UtxoRepo.ProcessTransaction(tx, TransactionLabels.ToArray());
+        TransactionLabels.Clear();
+        Inputs.Clear();
+        Outputs.Clear();
+        TransactionProcessed.InvokeAsync();
+    }
+
+    public class CoinWithKey : Coin
+    {
+        private readonly Network _network;
+        private readonly Key _key;
+
+        public CoinWithKey(Network network, Key key, OutPoint outPoint)
+        {
+            _network = network;
+            _key = key;
+            Outpoint = outPoint;
+            TxOut = new TxOut(Amount, Script);
+        }
+
+        public BitcoinSecret Secret => _key.GetWif(_network);
+        public Script Script => _key.GetScriptPubKey(ScriptPubKeyType.Segwit);
+    }
+
+    private void CreateForeignInput()
+    {
+        Inputs.Add(new CoinWithKey(UtxoRepo.Network, new Key(), CreateOutPoint()));
+    }
+
+    private void CreateForeignOutput()
+    {
+        Outputs.Add(new TxOut(Money.Coins(1m), new Key()));
+    }
+
+    public string? OwnUtxo { get; set; }
+
+    private void CreateOwnInput()
+    {
+        if (string.IsNullOrEmpty(OwnUtxo))
+            return;
+        var scripts = UtxoRepo.Utxos.Where(pair => pair.Key.ToString() == OwnUtxo);
+        foreach (var keyValuePair in scripts)
+        {
+            foreach (var point in keyValuePair.Value)
+            {
+                if (Inputs.Any(key => key.Outpoint == point))
+                {
+                    continue;
+                }
+                Inputs.Add(new CoinWithKey(UtxoRepo.Network, UtxoRepo.Keys[keyValuePair.Key], point));
+            }
+        }
+        OwnUtxo = null;
+    }
+
+    private void CreateOwnDestination()
+    {
+        if (string.IsNullOrEmpty(OwnDestination))
+            return;
+        var scripts = UtxoRepo.Utxos.Where(pair => pair.Key.ToString() == OwnDestination);
+
+        foreach (var keyValuePair in scripts)
+        {
+            Outputs.Add(new TxOut(Money.Coins(0.1m), keyValuePair.Key));
+        }
+        OwnDestination = null;
+    }
+
+    public string? OwnDestination { get; set; }
+
+}

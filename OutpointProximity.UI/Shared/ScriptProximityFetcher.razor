@@ -1,0 +1,160 @@
+﻿@using NBitcoin
+@inject UTXORepo UtxoRepo
+
+<div class="card">
+
+    <div class="card-header h3">Proximity Fetcher</div>
+    <div class="card-body">
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>
+                    Label
+                </th>
+                <th>Distance</th>
+                <th>Include</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var param in ParametersList)
+            {
+                <tr>
+                    <td>@param.Label</td>
+                    <td>@param.Distance</td>
+                    <td>@param.Include</td>
+                    <td>
+                        <button type="button" class="btn btn-secondary btn-sm " @onclick="() => ParametersList.Remove(param)">Remove</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+            <tr>
+                <td>
+                    <LabelManager Labels="Labels" SelectedLabels="new List<string>() {Label}" SelectedLabelsChanged="Callback"></LabelManager>
+                </td>
+
+                <td >
+                    <input type="number" class="form-control form-control-sm" @bind="Distance" placeholder="Distance" min="0">
+                </td>
+
+                <td>
+                    <div class="form-check form-check-inline  form-control-sm">
+                        <input class="form-check-input" type="checkbox" @bind="Include">
+                        <label class="form-check-label">
+                            Include
+                        </label>
+                    </div>
+                </td>
+
+                <td>
+                    <button type="button" class="btn btn-primary btn-sm  " @onclick="AddParamter">Add</button>
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+
+
+        <button class="btn btn-primary" @onclick="FetchResults">Fetch</button>
+
+
+        @if (Results is not null)
+        {
+            <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>Labels</th>
+                        <th>Links</th>
+                        <th>UTXOs</th>
+                    </tr>
+                    </thead>
+                @foreach (var result in Results)
+                {
+                    <tr>
+                        <td>@result.GetDestinationAddress(UtxoRepo.Network)</td>
+                        <td>
+                            <LabelManager
+                                SelectedLabels="UtxoRepo.GetLabelsOfScript(result).ToList()"
+                                Labels="UtxoRepo.LabelsToScripts.Keys.ToArray()"
+                                ReadOnly="true">
+                            </LabelManager>
+                        </td>
+                        <td>
+                            @foreach (var scriptLink in UtxoRepo.GetScriptLinks(result))
+                            {
+                                <span class="badge bg-info">@scriptLink.GetDestinationAddress(UtxoRepo.Network) </span>
+                            }
+                        </td>
+                        <td>
+                            @{
+                                UtxoRepo.Utxos.TryGetValue(result, out var utxos);
+                            }
+                            @(utxos?.Count ?? 0) utxos
+                        </td>
+                    </tr>
+                }
+
+            </table>
+        }
+    </div>
+</div>
+
+
+@code {
+
+
+    [Parameter]
+    public string[] Labels { get; set; }
+
+    public List<UTXORepo.ProximityParameters> ParametersList { get; set; } = new();
+    public string? Label { get; set; }
+
+
+    public int Distance { get; set; }
+    public bool Include { get; set; }
+
+    private void Callback(List<string> obj)
+    {
+        Label = obj.FirstOrDefault(s => s!=null);
+    }
+
+    public HashSet<Script> Results { get; set; }
+
+
+    private void FetchResults()
+    {
+        var results = ParametersList.Select(UtxoRepo.GetScriptsByProximity);
+        var workingResult = new HashSet<Script>();
+        var first = true;
+        foreach (var result in results)
+        {
+            if (first)
+            {
+                workingResult = result;
+                first = false;
+                continue;
+            }
+            workingResult.IntersectWith(result);
+        }
+        Results = workingResult;
+    }
+
+    private void AddParamter()
+    {
+        if (string.IsNullOrEmpty(Label))
+        {
+            return;
+        }
+        ParametersList.Add(new UTXORepo.ProximityParameters()
+        {
+            Distance = Distance,
+            Include = Include,
+            Label = Label
+        });
+        Label = null;
+    }
+
+}

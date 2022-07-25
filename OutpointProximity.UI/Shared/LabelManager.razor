@@ -1,0 +1,65 @@
+﻿@inject UTXORepo UtxoRepo
+<div>
+    @foreach (var label in SelectedLabels)
+    {
+        <span class="badge bg-secondary">@label</span>
+    }
+    @if (!ReadOnly)
+    {
+        <div class="input-group mb-3 input-group-sm">
+            <input class="form-control form-control-sm" list="@($"lbl-manager-datalist-{Id}")" placeholder="Type to search..." @bind="newLabel">
+            <datalist id="@($"lbl-manager-datalist-{Id}")">
+                @foreach (var label in Labels.Where(s => !SelectedLabels.Contains(s)))
+                {
+                    <option value="@label"/>
+                }
+            </datalist>
+
+            <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="AddLabel">Add</button>
+
+        </div>
+    }
+</div>
+
+@code {
+
+    public string Id { get; } = Guid.NewGuid().ToString();
+
+    [Parameter]
+    public List<string> SelectedLabels { get; set; }
+
+    [Parameter]
+    public string[] Labels { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<List<string>> SelectedLabelsChanged { get; set; }
+
+    public string newLabel { get; set; }
+
+    private void UnselectLabel(string label)
+    {
+        if (ReadOnly)
+        {
+            return;
+        }
+        var list = SelectedLabels.ToList();
+        list.Remove(label);
+        SelectedLabelsChanged.InvokeAsync(list);
+    }
+
+    private void AddLabel()
+    {
+        if (ReadOnly || string.IsNullOrEmpty(newLabel))
+        {
+            return;
+        }
+        var list = SelectedLabels.ToList();
+        list.Add(newLabel);
+        SelectedLabelsChanged.InvokeAsync(list);
+        newLabel = "";
+    }
+
+}

@@ -1,0 +1,84 @@
+﻿@page "/"
+@using NBitcoin
+@inject UTXORepo UtxoRepo
+<PageTitle>Index</PageTitle>
+
+<h1>UTXO Proximator</h1>
+
+
+<h2>Your addresses</h2>
+<div>
+
+    <LabelManager SelectedLabels="UtxoRepo.LabelsToScripts.Keys.ToList()" ReadOnly="true"></LabelManager>
+</div>
+<table class="table">
+    <thead>
+    <tr>
+        <th>Address</th>
+        <th>Labels</th>
+        <th>Links</th>
+        <th>UTXOs</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var script in UtxoRepo.Utxos)
+    {
+        <tr>
+            <td>@script.Key.GetDestinationAddress(UtxoRepo.Network)</td>
+            <td>
+                <LabelManager
+                    SelectedLabels="UtxoRepo.GetLabelsOfScript(script.Key).ToList()"
+                    Labels="UtxoRepo.LabelsToScripts.Keys.ToArray()"
+                    SelectedLabelsChanged="list => LabelsChanged(script, list)">
+                </LabelManager>
+            </td>
+            <td>
+                @foreach (var scriptLink in UtxoRepo.GetScriptLinks(script.Key))
+                {
+                    <span class="badge bg-info">@scriptLink.GetDestinationAddress(UtxoRepo.Network) </span>
+                }
+            </td>
+            <td>
+                @script.Value.Count utxos
+            </td>
+        </tr>
+    }
+    </tbody>
+    <tfoot>
+    <tr>
+        <td>
+            <button class="btn btn-primary" @onclick="Generate"> Generate new script</button>
+        </td>
+        <td>
+            <LabelManager @bind-SelectedLabels="NewScriptLabels" Labels="UtxoRepo.LabelsToScripts.Keys.ToArray()"></LabelManager>
+        </td>
+        <td></td>
+        <td></td>
+    </tr>
+    </tfoot>
+</table>
+
+<TransactionCreate TransactionProcessed="o => StateHasChanged()"></TransactionCreate>
+<ScriptProximityFetcher Labels="UtxoRepo.LabelsToScripts.Keys.ToArray()"></ScriptProximityFetcher>
+
+<Visualizer Scripts="UtxoRepo.Utxos.Keys"></Visualizer>
+
+@code
+{
+    public List<string> NewScriptLabels { get; set; } = new List<string>();
+
+
+    private void LabelsChanged(KeyValuePair<Script, HashSet<OutPoint>> script, List<string> list)
+    {
+        UtxoRepo.AddLabelsToScript(script.Key, list.ToArray());
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Generate()
+    {
+        UtxoRepo.GenerateScript(NewScriptLabels.ToArray());
+        NewScriptLabels.Clear();
+        InvokeAsync(StateHasChanged);
+    }
+
+}

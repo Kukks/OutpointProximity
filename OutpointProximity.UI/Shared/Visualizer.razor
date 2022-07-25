@@ -1,0 +1,177 @@
+﻿@using NBitcoin
+@using GraphShape.Algorithms.Layout
+@using Blazor.Diagrams.Core.Geometry
+@inject UTXORepo UtxoRepo
+<div class="card">
+    
+    <h3 class="card-header">Visualizer</h3>
+    <div class="card-body">
+           <div>
+                <select class="form-select" @bind="Layout">
+                    @foreach (var algo in algos)
+                    {
+                        <option value="@algo">@algo</option>
+                    }
+                </select>
+        
+            </div>
+        <div class="w-100" style="height: 50vh">
+            <button class="btn btn-primary position-absolute m-2"
+                    style="z-index: 999;"
+                    @onclick="() => Diagram.ZoomToFit(50)">Zoom to fit</button>
+            <CascadingValue Value="Diagram">
+                <DiagramCanvas ></DiagramCanvas>
+            </CascadingValue>
+        </div>
+    </div>
+</div>
+
+ 
+
+
+@code {
+
+    [Parameter]
+    public IEnumerable<Script> Scripts
+    {
+        get => _scripts;
+        set
+        {
+            _scripts = value;
+            Construct(value);
+        }
+    }
+    private IEnumerable<string> algos = new StandardLayoutAlgorithmFactory<string, QuikGraph.IEdge<string>, QuikGraph.IBidirectionalGraph<string, QuikGraph.IEdge<string>>>().AlgorithmTypes;
+
+    public string? Layout
+    {
+        get => _layout;
+        set
+        {
+            _layout = value;
+            OnLayout();
+        }
+    }
+
+    private Diagram Diagram { get; set; } = new Diagram();
+
+    protected override void OnInitialized()
+    {
+        _layout = algos.First();
+        
+        Diagram.RegisterModelComponent<ScriptNodeModel, ScriptNode>();
+        Diagram.Options.AllowPanning = true;
+        Diagram.Options.Zoom.Enabled = true;
+        base.OnInitialized();
+    }
+
+
+    public class ScriptNodeModel : NodeModel
+    {
+        private readonly Network _network;
+        public Script Script { get; set; }
+
+        public ScriptNodeModel(Script script, Network network):base(script.GetDestinationAddress(network).ToString())
+        {
+            _network = network;
+            Script = script;
+            Title = script.GetDestinationAddress(network).ToString();
+        }
+    }
+
+    private NodeModel NewNode(Script script)
+    {
+        return new ScriptNodeModel(script, UtxoRepo.Network);
+    }
+    public void Construct(IEnumerable<Script> scripts)
+    {
+        Diagram.Locked = true;
+        Diagram.Nodes.Clear();
+        Diagram.Links.Clear();
+        if (scripts?.Any() is not true)
+        {
+            return;
+        }
+        Dictionary<Script, NodeModel> nodes = new();
+        List<LinkModel> links = new();
+        
+        foreach (var script in scripts)
+        {
+            var node = NewNode(script);
+            nodes.TryAdd(script, node);
+            
+            var scriptLinks = UtxoRepo.GetScriptLinks(script);
+            foreach (var scriptLink in scriptLinks)
+            {
+                if (!nodes.TryGetValue(scriptLink, out var nodeModel))
+                {
+                    nodeModel = NewNode(scriptLink);
+                    
+                    nodeModel.AddPort();
+                    nodes.TryAdd(scriptLink, nodeModel);
+                }
+                links.Add(new LinkModel(node, nodeModel )
+                {
+                    PathGenerator = PathGenerators.Straight,
+                    Router = Routers.Normal
+                });
+            }
+           
+        }
+        Diagram.Nodes.Add(nodes.Values);
+        Diagram.Links.Add(links);
+        OnLayout();
+    }
+
+
+    private IEnumerable<Script> _scripts;
+    private string? _layout;
+
+    private void OnLayout()
+    {
+        if (string.IsNullOrWhiteSpace(_layout))
+        {
+            return;
+        }
+
+    // convert Z.Blazor.Diagram to QuikGraph
+        var graph = new QuikGraph.BidirectionalGraph<ScriptNodeModel, QuikGraph.Edge<ScriptNodeModel>>();
+        var nodes = Diagram.Nodes.OfType<ScriptNodeModel>().ToList();
+        var edges = Diagram.Links.OfType<LinkModel>()
+            .Select(lm =>
+            {
+                var source = nodes.Single(dn => dn.Id == lm.SourceNode.Id);
+                var target = nodes.Single(dn => dn.Id == lm?.TargetNode?.Id);
+                return new QuikGraph.Edge<ScriptNodeModel>(source, target);
+            })
+            .ToList();
+        graph.AddVertexRange(nodes);
+        graph.AddEdgeRange(edges);
+
+    // run GraphShape algorithm
+        var positions = nodes.ToDictionary(nm => nm, dn => new GraphShape.Point(dn.Position.X, dn.Position.Y));
+        var sizes = nodes.ToDictionary(nm => nm, dn => new GraphShape.Size( 350, 200));
+        var layoutCtx = new LayoutContext<ScriptNodeModel, QuikGraph.Edge<ScriptNodeModel>, QuikGraph.BidirectionalGraph<ScriptNodeModel, QuikGraph.Edge<ScriptNodeModel>>>(graph, positions, sizes, LayoutMode.Simple);
+        var algoFact = new StandardLayoutAlgorithmFactory<ScriptNodeModel, QuikGraph.Edge<ScriptNodeModel>, QuikGraph.BidirectionalGraph<ScriptNodeModel, QuikGraph.Edge<ScriptNodeModel>>>();
+        var algo = algoFact.CreateAlgorithm(_layout, layoutCtx, null);
+
+        algo.Compute();
+
+    // update NodeModel positions
+        try
+        {
+            Diagram.SuspendRefresh = true;
+            foreach (var vertPos in algo.VerticesPositions)
+            {
+    // NOTE;  have to use SetPosition which takes care of updating everything
+                vertPos.Key.SetPosition(vertPos.Value.X, vertPos.Value.Y);
+            }
+        }
+        finally
+        {
+            Diagram.SuspendRefresh = false;
+        }
+    }
+  
+
+   }

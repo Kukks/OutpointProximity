@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OutpointProximity", "OutpointProximity\OutpointProximity.csproj", "{10DFCEC1-A0ED-4D5A-BFB9-456C5FC874A5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OutpointProximity.Tests", "OutpointProximity.Tests\OutpointProximity.Tests.csproj", "{C223599E-CEDF-4921-9A92-CB7A49C371AE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OutpointProximity.UI", "OutpointProximity.UI\OutpointProximity.UI.csproj", "{98322BFB-873E-40B4-A41C-E1491562304F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OutpointProximity.UI.Server", "OutpointProximity.UI.Server\OutpointProximity.UI.Server.csproj", "{A5317018-217D-4A53-9089-517BDC2FA085}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{10DFCEC1-A0ED-4D5A-BFB9-456C5FC874A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10DFCEC1-A0ED-4D5A-BFB9-456C5FC874A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10DFCEC1-A0ED-4D5A-BFB9-456C5FC874A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10DFCEC1-A0ED-4D5A-BFB9-456C5FC874A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C223599E-CEDF-4921-9A92-CB7A49C371AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C223599E-CEDF-4921-9A92-CB7A49C371AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C223599E-CEDF-4921-9A92-CB7A49C371AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C223599E-CEDF-4921-9A92-CB7A49C371AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98322BFB-873E-40B4-A41C-E1491562304F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98322BFB-873E-40B4-A41C-E1491562304F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98322BFB-873E-40B4-A41C-E1491562304F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98322BFB-873E-40B4-A41C-E1491562304F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5317018-217D-4A53-9089-517BDC2FA085}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5317018-217D-4A53-9089-517BDC2FA085}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5317018-217D-4A53-9089-517BDC2FA085}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5317018-217D-4A53-9089-517BDC2FA085}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
