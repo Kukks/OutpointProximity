@@ -1,6 +1,7 @@
 ﻿@using NBitcoin
 @using GraphShape.Algorithms.Layout
 @using Blazor.Diagrams.Core.Geometry
+@using QuikGraph
 @inject UTXORepo UtxoRepo
 <div class="card">
     
@@ -18,7 +19,7 @@
         <div class="w-100" style="height: 50vh">
             <button class="btn btn-primary position-absolute m-2"
                     style="z-index: 999;"
-                    @onclick="() => Diagram.ZoomToFit(50)">Zoom to fit</button>
+                    @onclick="() => Diagram.ZoomToFit(10)">Zoom to fit</button>
             <CascadingValue Value="Diagram">
                 <DiagramCanvas ></DiagramCanvas>
             </CascadingValue>
@@ -88,39 +89,94 @@
         Diagram.Locked = true;
         Diagram.Nodes.Clear();
         Diagram.Links.Clear();
+        for (var i = Diagram.Groups.Count - 1; i >= 0; i--)
+        {
+            Diagram.RemoveGroup(Diagram.Groups[i]);
+        }
         if (scripts?.Any() is not true)
         {
             return;
         }
         Dictionary<Script, NodeModel> nodes = new();
-        List<LinkModel> links = new();
+        Dictionary<string, LinkModel> links = new();
         
+        xx(scripts, nodes, links);
+        
+        foreach (var utxoRepoLabelsToScript in UtxoRepo.LabelsToScripts)
+        {
+            for (int i = 0; i < utxoRepoLabelsToScript.Value.Count; i++)
+            {
+                for (int x = 0; x < utxoRepoLabelsToScript.Value.Count; x++)
+                {
+                    if (i == x)
+                    {
+                        continue;
+                    }
+                    var srcScript = utxoRepoLabelsToScript.Value.ElementAt(i);
+                    var targetScript = utxoRepoLabelsToScript.Value.ElementAt(x);
+                    var src = srcScript.GetDestinationAddress(UtxoRepo.Network);
+                    var target = targetScript.GetDestinationAddress(UtxoRepo.Network);
+                    var p1 = $"{src}_{target}";
+                    var p2 = $"{target}_{src}";
+                    if (links.ContainsKey(p1) || links.ContainsKey(p2))
+                    {
+                        continue;
+                        
+                    }
+                    if (!nodes.TryGetValue(srcScript, out var srcNode))
+                    {
+                        srcNode = NewNode(srcScript);
+                        nodes.TryAdd(srcScript,srcNode);
+                    }
+                    if (!nodes.TryGetValue(targetScript, out var targetNode))
+                    {
+                        targetNode = NewNode(targetScript);
+                        nodes.TryAdd(targetScript,targetNode);
+                    }
+                    links.TryAdd(p1,new LinkModel(p1,srcNode, targetNode)
+                    {
+                        PathGenerator = PathGenerators.Straight,
+                        Router = Routers.Normal
+                    });
+                }
+            }
+        }
+        Diagram.Nodes.Add(nodes.Values);
+        Diagram.Links.Add(links.Values);
+        
+        OnLayout();
+    }
+
+    private void xx(IEnumerable<Script> scripts, Dictionary<Script, NodeModel> nodes, Dictionary<string,LinkModel> links, int i = 0)
+    {
+        if (i >= 50)
+        {
+            return;
+        }
         foreach (var script in scripts)
         {
             var node = NewNode(script);
             nodes.TryAdd(script, node);
-            
+
             var scriptLinks = UtxoRepo.GetScriptLinks(script);
             foreach (var scriptLink in scriptLinks)
             {
-                if (!nodes.TryGetValue(scriptLink, out var nodeModel))
+                if (!nodes.TryGetValue(scriptLink, out var scriptLinkNodeModel))
                 {
-                    nodeModel = NewNode(scriptLink);
-                    
-                    nodeModel.AddPort();
-                    nodes.TryAdd(scriptLink, nodeModel);
+                    scriptLinkNodeModel = NewNode(scriptLink);
+                    if (nodes.TryAdd(scriptLink, scriptLinkNodeModel))
+                    {
+                        xx(new []{scriptLink}, nodes, links, i + 1);
+                    }
                 }
-                links.Add(new LinkModel(node, nodeModel )
+
+                links.TryAdd($"{node.Id}_{scriptLinkNodeModel.Id}",new LinkModel($"{node.Id}_{scriptLinkNodeModel.Id}",node, scriptLinkNodeModel)
                 {
                     PathGenerator = PathGenerators.Straight,
                     Router = Routers.Normal
                 });
             }
-           
         }
-        Diagram.Nodes.Add(nodes.Values);
-        Diagram.Links.Add(links);
-        OnLayout();
     }
 
 

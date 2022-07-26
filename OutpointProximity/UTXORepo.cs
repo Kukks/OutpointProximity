@@ -120,7 +120,7 @@ public class UTXORepo
         ScriptLinks.TryGetValue(script, out var childLinks);
         childLinks ??= new HashSet<Script>();
         return ScriptLinks.Where(pair => pair.Value.Contains(script))
-            .SelectMany(pair => pair.Value.Concat(new[] {pair.Key})).Concat(childLinks).ToHashSet();
+            .SelectMany(pair => pair.Value.Concat(new[] {pair.Key})).Concat(childLinks).Where(script1 => script1 != script).ToHashSet();
     }
 
     public HashSet<Script> GetScriptsByProximity(ProximityParameters parameters)
